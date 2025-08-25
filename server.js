@@ -1,4 +1,7 @@
-// --- FixMap Backend Server --- FINAL CLEAN VERSION ---
+// --- FixMap Backend Server --- FINAL CORRECTED VERSION ---
+
+// Load environment variables from .env file
+require('dotenv').config();
 
 const express = require('express');
 const { Pool } = require('pg');
@@ -16,21 +19,22 @@ const DATABASE_URL = process.env.DATABASE_URL;
 app.use(express.json());
 app.use(cors());
 
-// --- CONFIGURE CLOUDINARY HERE ---
+// Configure Cloudinary with environment variables
 cloudinary.config({ 
-  cloud_name: 'dwkuc8pfe', 
-  api_key: '893482616156297', 
-  api_secret: 'QEZbZniL35gnXbUTsvb47aui-PE' 
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
+  api_key: process.env.CLOUDINARY_API_KEY, 
+  api_secret: process.env.CLOUDINARY_API_SECRET 
 });
 
 const upload = multer({ dest: 'uploads/' });
 
+// Configure Database Connection with environment variables
 const pool = new Pool({
     connectionString: DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// --- Middleware ---
+// Middleware
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -52,7 +56,7 @@ const authorizeRole = (requiredRole) => {
     };
 };
 
-// --- API Endpoints ---
+// API Endpoints
 
 app.post('/api/upload', authenticateToken, upload.single('image'), async (req, res) => {
     try {
@@ -155,7 +159,7 @@ app.get('/api/reports-all', authenticateToken, authorizeRole('municipal_official
 
 app.patch('/api/reports/:id', authenticateToken, authorizeRole('municipal_official'), async (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const { id } = req.params;
         const { status } = req.body;
         if (!status) {
             return res.status(400).json({ message: 'Status is required.' });
@@ -166,7 +170,7 @@ app.patch('/api/reports/:id', authenticateToken, authorizeRole('municipal_offici
             return res.status(404).json({ message: 'Report not found.' });
         }
         res.status(200).json({ message: 'Report status updated successfully!', report: result.rows[0] });
-    } catch (error)
+    } catch (error) { // <-- THIS IS THE BLOCK THAT HAD THE ERROR
         console.error('Error updating report:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
