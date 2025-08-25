@@ -1,7 +1,7 @@
 // --- FixMap Backend Server --- FINAL DEPLOYMENT VERSION ---
 
 // 1. Import necessary libraries
-const express = require('-');
+const express = require('express'); // <-- This is the fix
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
