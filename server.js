@@ -1,26 +1,27 @@
-// --- FixMap Backend Server --- FINAL CORRECTED VERSION ---
+// --- FixMap Backend Server --- FINAL DEPLOYMENT VERSION ---
 
 // 1. Import necessary libraries
-const express = require('express');
+const express = require('-');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 
-// 2. Setup Express App & JWT Secret
+// 2. Setup Express App & Environment Variables
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000; // Render provides the PORT
+const JWT_SECRET = process.env.JWT_SECRET; // Render provides the JWT_SECRET
+const DATABASE_URL = process.env.DATABASE_URL; // Render provides the DATABASE_URL
+
 app.use(express.json());
 app.use(cors());
-const JWT_SECRET = '2d8A7Gsek93mANZyLC4u4GfeV6bDHDBrdHLDfugK1Hv4kUNoDbhdAhbnJPnQ8E3T'; // <-- PUT YOUR SECRET KEY HERE
 
 // 3. Configure Database Connection
 const pool = new Pool({
-    user: 'fixmap_user',
-    host: 'localhost',
-    database: 'fixmap_db',
-    password: 'mohamed2006', // <-- PUT YOUR DATABASE PASSWORD HERE
-    port: 5432,
+    connectionString: DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 // 4. Middleware
@@ -97,7 +98,7 @@ app.post('/api/login', async (req, res) => {
 
 // --- PROTECTED ROUTES ---
 
-// Submit a new report (any logged-in user can do this)
+// Submit a new report
 app.post('/api/reports', authenticateToken, async (req, res) => {
     try {
         const { latitude, longitude, imageUrl } = req.body;
@@ -129,7 +130,7 @@ app.get('/api/my-reports', authenticateToken, async (req, res) => {
 });
 
 
-// Fetch ALL reports for the municipal dashboard (officials only)
+// Fetch ALL reports for the municipal dashboard
 app.get('/api/reports-all', authenticateToken, authorizeRole('municipal_official'), async (req, res) => {
     try {
         const query = `SELECT r.*, u.name as citizen_name, u.email as citizen_email FROM reports r JOIN users u ON r.user_id = u.id ORDER BY r.created_at DESC;`;
@@ -141,7 +142,7 @@ app.get('/api/reports-all', authenticateToken, authorizeRole('municipal_official
     }
 });
 
-// Update a report's status (officials only)
+// Update a report's status
 app.patch('/api/reports/:id', authenticateToken, authorizeRole('municipal_official'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -164,5 +165,5 @@ app.patch('/api/reports/:id', authenticateToken, authorizeRole('municipal_offici
 
 // 6. Start the server
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`FixMap server is running on http://localhost:${PORT}`);
+    console.log(`FixMap server is running on port ${PORT}`);
 });
