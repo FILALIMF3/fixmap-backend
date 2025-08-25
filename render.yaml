@@ -1,12 +1,12 @@
-services:
-  # This is our PostgreSQL Database
-  - type: psql
-    name: fixmap-db
+# The list of databases for our project
+databases:
+  - name: fixmap-db
     databaseName: fixmap_db
     user: fixmap_user
     plan: free
 
-  # This is our Node.js Web Server
+# The list of web services for our project
+services:
   - type: web
     name: fixmap-server
     env: node
