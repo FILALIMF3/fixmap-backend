@@ -155,7 +155,7 @@ app.get('/api/reports-all', authenticateToken, authorizeRole('municipal_official
 
 app.patch('/api/reports/:id', authenticateToken, authorizeRole('municipal_official'), async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = parseInt(req.params.id, 10);
         const { status } = req.body;
         if (!status) {
             return res.status(400).json({ message: 'Status is required.' });
