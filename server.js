@@ -1,30 +1,36 @@
-// --- FixMap Backend Server --- FINAL DEPLOYMENT VERSION ---
+// --- FixMap Backend Server --- FINAL CLEAN VERSION ---
 
-// 1. Import necessary libraries
-const express = require('express'); // <-- This is the fix
+const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const cloudinary = require('cloudinary').v2;
+const multer = require('multer');
 
-// 2. Setup Express App & Environment Variables
 const app = express();
-const PORT = process.env.PORT || 3000; // Render provides the PORT
-const JWT_SECRET = process.env.JWT_SECRET; // Render provides the JWT_SECRET
-const DATABASE_URL = process.env.DATABASE_URL; // Render provides the DATABASE_URL
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET;
+const DATABASE_URL = process.env.DATABASE_URL;
 
 app.use(express.json());
 app.use(cors());
 
-// 3. Configure Database Connection
-const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
+// --- CONFIGURE CLOUDINARY HERE ---
+cloudinary.config({ 
+  cloud_name: 'dwkuc8pfe', 
+  api_key: '893482616156297', 
+  api_secret: 'QEZbZniL35gnXbUTsvb47aui-PE' 
 });
 
-// 4. Middleware
+const upload = multer({ dest: 'uploads/' });
+
+const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+});
+
+// --- Middleware ---
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -46,9 +52,21 @@ const authorizeRole = (requiredRole) => {
     };
 };
 
-// 5. API Endpoints
+// --- API Endpoints ---
 
-// Register a new user
+app.post('/api/upload', authenticateToken, upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No image file uploaded.' });
+        }
+        const result = await cloudinary.uploader.upload(req.file.path);
+        res.status(200).json({ imageUrl: result.secure_url });
+    } catch (error) {
+        console.error('Image upload error:', error);
+        res.status(500).json({ message: 'Error uploading image.' });
+    }
+});
+
 app.post('/api/register', async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -71,7 +89,6 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// Login a user
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -96,9 +113,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// --- PROTECTED ROUTES ---
-
-// Submit a new report
 app.post('/api/reports', authenticateToken, async (req, res) => {
     try {
         const { latitude, longitude, imageUrl } = req.body;
@@ -116,7 +130,6 @@ app.post('/api/reports', authenticateToken, async (req, res) => {
     }
 });
 
-// Fetch reports for the currently logged-in citizen
 app.get('/api/my-reports', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.userId;
@@ -129,8 +142,6 @@ app.get('/api/my-reports', authenticateToken, async (req, res) => {
     }
 });
 
-
-// Fetch ALL reports for the municipal dashboard
 app.get('/api/reports-all', authenticateToken, authorizeRole('municipal_official'), async (req, res) => {
     try {
         const query = `SELECT r.*, u.name as citizen_name, u.email as citizen_email FROM reports r JOIN users u ON r.user_id = u.id ORDER BY r.created_at DESC;`;
@@ -142,7 +153,6 @@ app.get('/api/reports-all', authenticateToken, authorizeRole('municipal_official
     }
 });
 
-// Update a report's status
 app.patch('/api/reports/:id', authenticateToken, authorizeRole('municipal_official'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -156,14 +166,13 @@ app.patch('/api/reports/:id', authenticateToken, authorizeRole('municipal_offici
             return res.status(404).json({ message: 'Report not found.' });
         }
         res.status(200).json({ message: 'Report status updated successfully!', report: result.rows[0] });
-    } catch (error) {
+    } catch (error)
         console.error('Error updating report:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
 
-
-// 6. Start the server
+// Start the server
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`FixMap server is running on port ${PORT}`);
 });
