@@ -1,6 +1,6 @@
 // --- FixMap Backend Server --- FINAL CORRECTED VERSION ---
 
-// Load environment variables from .env file
+// Load environment variables from .env file for local development
 require('dotenv').config();
 
 const express = require('express');
@@ -26,15 +26,17 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET 
 });
 
+// Set up Multer to handle file uploads temporarily
 const upload = multer({ dest: 'uploads/' });
 
 // Configure Database Connection with environment variables
 const pool = new Pool({
     connectionString: DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    // SSL is required for Render
+    ssl: { rejectUnauthorized: false }
 });
 
-// Middleware
+// --- Middleware ---
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -56,8 +58,9 @@ const authorizeRole = (requiredRole) => {
     };
 };
 
-// API Endpoints
+// --- API Endpoints ---
 
+// Endpoint for image uploads
 app.post('/api/upload', authenticateToken, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
@@ -71,6 +74,7 @@ app.post('/api/upload', authenticateToken, upload.single('image'), async (req, r
     }
 });
 
+// Endpoint for user registration
 app.post('/api/register', async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -93,6 +97,7 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
+// Endpoint for user login
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -117,6 +122,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// Endpoint for submitting a report
 app.post('/api/reports', authenticateToken, async (req, res) => {
     try {
         const { latitude, longitude, imageUrl } = req.body;
@@ -134,6 +140,7 @@ app.post('/api/reports', authenticateToken, async (req, res) => {
     }
 });
 
+// Endpoint to get a citizen's own reports
 app.get('/api/my-reports', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.userId;
@@ -146,6 +153,19 @@ app.get('/api/my-reports', authenticateToken, async (req, res) => {
     }
 });
 
+// Endpoint to get all public reports for the map
+app.get('/api/reports/public', authenticateToken, async (req, res) => {
+    try {
+        const query = `SELECT id, latitude, longitude, status, image_url FROM reports WHERE status = 'Submitted';`;
+        const result = await pool.query(query);
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Error fetching public reports:', error);
+        res.status(500).json({ message: 'An internal server error occurred.' });
+    }
+});
+
+// Endpoint to get all reports for the dashboard
 app.get('/api/reports-all', authenticateToken, authorizeRole('municipal_official'), async (req, res) => {
     try {
         const query = `SELECT r.*, u.name as citizen_name, u.email as citizen_email FROM reports r JOIN users u ON r.user_id = u.id ORDER BY r.created_at DESC;`;
@@ -157,9 +177,10 @@ app.get('/api/reports-all', authenticateToken, authorizeRole('municipal_official
     }
 });
 
+// Endpoint to update a report's status
 app.patch('/api/reports/:id', authenticateToken, authorizeRole('municipal_official'), async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = parseInt(req.params.id, 10);
         const { status } = req.body;
         if (!status) {
             return res.status(400).json({ message: 'Status is required.' });
@@ -170,7 +191,7 @@ app.patch('/api/reports/:id', authenticateToken, authorizeRole('municipal_offici
             return res.status(404).json({ message: 'Report not found.' });
         }
         res.status(200).json({ message: 'Report status updated successfully!', report: result.rows[0] });
-    } catch (error) { // <-- THIS IS THE BLOCK THAT HAD THE ERROR
+    } catch (error) {
         console.error('Error updating report:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
